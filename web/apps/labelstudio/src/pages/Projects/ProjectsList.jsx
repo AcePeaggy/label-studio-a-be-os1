@@ -1,20 +1,51 @@
 import chr from "chroma-js";
 import { format } from "date-fns";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { IconCheck, IconEllipsis, IconMinus, IconSparks } from "@humansignal/icons";
+import {
+  IconCheck,
+  IconEllipsis,
+  IconMinus,
+  IconSparks
+} from "@humansignal/icons";
 import { Userpic } from "@humansignal/ui";
 import { Button, Dropdown, Menu, Pagination } from "../../components";
 import { Block, Elem } from "../../utils/bem";
 import { absoluteURL } from "../../utils/helpers";
 
 const DEFAULT_CARD_COLORS = ["#FFFFFF", "#FDFDFC"];
+const LOCALSTORAGE_IS_STAFF_KEY = "user_is_staff";
 
-export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, pageSize }) => {
+const getIsStaffFromLocalStorage = () => {
+  try {
+    const storedValue = localStorage.getItem(LOCALSTORAGE_IS_STAFF_KEY);
+    if (storedValue === null) {
+      // console.log("[EmptyProjectsList] isStaff not found in localStorage, defaulting to false.");
+      return false;
+    }
+    const parsedValue = JSON.parse(storedValue);
+    // console.log(`[EmptyProjectsList] isStaff read from localStorage: ${parsedValue}`);
+    return parsedValue === true;
+  } catch (e) {
+    console.error(
+      "[EmptyProjectsList] Failed to read/parse isStaff from localStorage, defaulting to false.",
+      e
+    );
+    return false;
+  }
+};
+
+export const ProjectsList = ({
+  projects,
+  currentPage,
+  totalItems,
+  loadNextPage,
+  pageSize
+}) => {
   return (
     <>
       <Elem name="list">
-        {projects.map((project) => (
+        {projects.map(project => (
           <ProjectCard key={project.id} project={project} />
         ))}
       </Elem>
@@ -35,16 +66,59 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
 };
 
 export const EmptyProjectsList = ({ openModal }) => {
+  const [isStaff, setIsStaff] = useState(getIsStaffFromLocalStorage());
+
+  useEffect(() => {
+    const updateStaffStatusFromStorage = () => {
+      const valueFromStorage = getIsStaffFromLocalStorage();
+      if (valueFromStorage !== isStaff) {
+        // console.log("[EmptyProjectsList] Updating isStaff state based on localStorage change or focus.");
+        setIsStaff(valueFromStorage);
+      }
+    };
+
+    window.addEventListener("storage", updateStaffStatusFromStorage);
+    window.addEventListener("focus", updateStaffStatusFromStorage);
+    updateStaffStatusFromStorage();
+
+    return () => {
+      window.removeEventListener("storage", updateStaffStatusFromStorage);
+      window.removeEventListener("focus", updateStaffStatusFromStorage);
+    };
+  }, [isStaff]);
+
   return (
     <Block name="empty-projects-page">
-      <Elem name="heidi" tag="img" src={absoluteURL("/static/images/opossum_looking.png")} />
-      <Elem name="header" tag="h1">
-        Heidi doesn’t see any projects here!
-      </Elem>
-      <p>Create one and start labeling your data.</p>
-      <Elem name="action" tag={Button} onClick={openModal} look="primary">
-        Create Project
-      </Elem>
+      <Elem
+        name="heidi"
+        tag="img"
+        src={absoluteURL("/static/images/opossum_looking.png")}
+      />
+
+      {isStaff ? (
+        <>
+          <Elem name="header" tag="h1">
+            Heidi doesn’t see any projects here!
+          </Elem>
+          <p>Create one and start labeling your data.</p>
+          <Elem name="action" tag={Button} onClick={openModal} look="primary">
+            Create Project
+          </Elem>
+        </>
+      ) : (
+        <>
+          <Elem name="header" tag="h1">
+            No Projects Available
+          </Elem>
+          <p>
+            There are currently no projects assigned to you or available to
+            view.
+          </p>
+          <p>
+            If you believe this is an error, please contact your administrator.
+          </p>
+        </>
+      )}
     </Block>
   );
 };
@@ -58,27 +132,40 @@ const ProjectCard = ({ project }) => {
     const textColor =
       color && chr(color).luminance() > 0.3
         ? "var(--color-neutral-inverted-content)"
-        : "var(--color-neutral-inverted-content)"; // Determine text color based on luminance
+        : "var(--color-neutral-inverted-content)";
     return color
       ? {
           "--header-color": color,
-          "--background-color": chr(color).alpha(0.2).css(),
+          "--background-color": chr(color)
+            .alpha(0.2)
+            .css(),
           "--text-color": textColor,
-          "--border-color": chr(color).alpha(0.5).css(),
+          "--border-color": chr(color)
+            .alpha(0.5)
+            .css()
         }
       : {};
   }, [color]);
 
   return (
-    <Elem tag={NavLink} name="link" to={`/projects/${project.id}/data`} data-external>
-      <Block name="project-card" mod={{ colored: !!color }} style={projectColors}>
+    <Elem
+      tag={NavLink}
+      name="link"
+      to={`/projects/${project.id}/data`}
+      data-external
+    >
+      <Block
+        name="project-card"
+        mod={{ colored: !!color }}
+        style={projectColors}
+      >
         <Elem name="header">
           <Elem name="title">
             <Elem name="title-text">{project.title ?? "New project"}</Elem>
 
             <Elem
               name="menu"
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 e.preventDefault();
               }}
@@ -86,8 +173,12 @@ const ProjectCard = ({ project }) => {
               <Dropdown.Trigger
                 content={
                   <Menu contextual>
-                    <Menu.Item href={`/projects/${project.id}/settings`}>Settings</Menu.Item>
-                    <Menu.Item href={`/projects/${project.id}/data?labeling=1`}>Label</Menu.Item>
+                    <Menu.Item href={`/projects/${project.id}/settings`}>
+                      Settings
+                    </Menu.Item>
+                    <Menu.Item href={`/projects/${project.id}/data?labeling=1`}>
+                      Label
+                    </Menu.Item>
                   </Menu>
                 }
               >
@@ -119,7 +210,9 @@ const ProjectCard = ({ project }) => {
         </Elem>
         <Elem name="description">{project.description}</Elem>
         <Elem name="info">
-          <Elem name="created-date">{format(new Date(project.created_at), "dd MMM ’yy, HH:mm")}</Elem>
+          <Elem name="created-date">
+            {format(new Date(project.created_at), "dd MMM ’yy, HH:mm")}
+          </Elem>
           <Elem name="created-by">
             <Userpic src="#" user={project.created_by} showUsername />
           </Elem>

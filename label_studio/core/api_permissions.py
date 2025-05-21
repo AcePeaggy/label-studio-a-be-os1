@@ -12,3 +12,11 @@ class MemberHasOwnerPermission(BasePermission):
             return False
 
         return obj.has_permission(request.user)
+
+
+class MemberHasAnnotatorPermission(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method not in SAFE_METHODS and not request.user.own_organization and not request.user.is_staff:
+            return False
+
+        return obj.has_permission(request.user)

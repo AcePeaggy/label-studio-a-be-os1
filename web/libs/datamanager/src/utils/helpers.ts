@@ -85,11 +85,15 @@ type ObjectToCamel<T> = {
 
 type KeysToCamelCase<T> = {
   [K in keyof T as CamelCase<string & K>]: T[K] extends Array<any>
-    ? KeysToCamelCase<T[K][number]>[]
-    : ObjectToCamel<T[K]>;
+  ? KeysToCamelCase<T[K][number]>[]
+  : ObjectToCamel<T[K]>;
 };
 
-export const camelizeKeys = <T extends AnyObject>(source: T): KeysToCamelCase<T> => {
+export const camelizeKeys = <T extends AnyObject>(source: T | null | undefined): KeysToCamelCase<T> | T | null | undefined => {
+
+  if (typeof source !== 'object' || source === null || source === undefined) {
+    return source; // Return source as is if it's not an object, or if it's null/undefined
+  }
   type Pair = [string, unknown];
 
   const split = Object.entries(source);
@@ -110,11 +114,11 @@ export const hasProperties = (obj: AnyObject, properties: string[], all?: boolea
 
   return all
     ? properties.reduce((res, prop) => {
-        return res && Object.prototype.hasOwnProperty.call(obj, prop);
-      }, true)
+      return res && Object.prototype.hasOwnProperty.call(obj, prop);
+    }, true)
     : properties.findIndex((prop) => {
-        return Object.prototype.hasOwnProperty.call(obj, prop);
-      }) >= 0;
+      return Object.prototype.hasOwnProperty.call(obj, prop);
+    }) >= 0;
 };
 
 export const objectClean = <T extends AnyObject>(source: T) => {

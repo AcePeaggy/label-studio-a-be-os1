@@ -1,6 +1,17 @@
-import { destroy, flow, types } from "mobx-state-tree";
+import {
+  destroy,
+  flow,
+  types,
+  applySnapshot,
+  getSnapshot
+} from "mobx-state-tree";
 import { Modal } from "../components/Common/Modal/Modal";
-import { FF_DEV_2887, FF_LOPS_E_3, FF_REGION_VISIBILITY_FROM_URL, isFF } from "../utils/feature-flags";
+import {
+  FF_DEV_2887,
+  FF_LOPS_E_3,
+  FF_REGION_VISIBILITY_FROM_URL,
+  isFF
+} from "../utils/feature-flags";
 import { History } from "../utils/history";
 import { isDefined } from "../utils/utils";
 import { Action } from "./Action";
@@ -17,13 +28,17 @@ import { ActivityObserver } from "../utils/ActivityObserver";
 let networkActivity = null;
 
 const PROJECTS_FETCH_PERIOD = 10 * 1000; // 10 seconds
+const LOCAL_STORAGE_IS_STAFF_KEY = "user_is_staff";
 
 export const AppStore = types
   .model("AppStore", {
-    mode: types.optional(types.enumeration(["explorer", "labelstream", "labeling"]), "explorer"),
+    mode: types.optional(
+      types.enumeration(["explorer", "labelstream", "labeling"]),
+      "explorer"
+    ),
 
     viewsStore: types.optional(TabStore, {
-      views: [],
+      views: []
     }),
 
     project: types.optional(CustomJSON, {}),
@@ -32,20 +47,22 @@ export const AppStore = types
 
     loadingData: false,
 
+    loadingCurrentUser: types.optional(types.boolean, false),
+
     users: types.optional(types.array(User), []),
 
     taskStore: types.optional(
       types.late(() => {
         return DynamicModel.get("tasksStore");
       }),
-      {},
+      {}
     ),
 
     annotationStore: types.optional(
       types.late(() => {
         return DynamicModel.get("annotationsStore");
       }),
-      {},
+      {}
     ),
 
     availableActions: types.optional(types.array(Action), []),
@@ -56,9 +73,11 @@ export const AppStore = types
 
     interfaces: types.map(types.boolean),
 
-    toolbar: types.string,
+    toolbar: types.optional(types.string, ""),
+
+    currentUser: types.maybeNull(User)
   })
-  .views((self) => ({
+  .views(self => ({
     /** @returns {import("../sdk/dm-sdk").DataManager} */
     get SDK() {
       return self._sdk;
@@ -79,7 +98,11 @@ export const AppStore = types
     },
 
     get isLabeling() {
-      return !!self.dataStore?.selected || self.isLabelStreamMode || self.mode === "labeling";
+      return (
+        !!self.dataStore?.selected ||
+        self.isLabelStreamMode ||
+        self.mode === "labeling"
+      );
     },
 
     get isLabelStreamMode() {
@@ -130,21 +153,22 @@ export const AppStore = types
     },
 
     get usersMap() {
-      return new Map(self.users.map((user) => [user.id, user]));
-    },
+      return new Map(self.users.map(user => [user.id, user]));
+    }
   }))
   .volatile(() => ({
     needsDataFetch: false,
     projectFetch: false,
-    requestsInFlight: new Map(),
+    requestsInFlight: new Map()
   }))
-  .actions((self) => ({
+  .actions(self => ({
     startPolling() {
       if (self._poll) return;
       if (self.SDK.polling === false) return;
 
-      const poll = async (self) => {
-        if (networkActivity.active) await self.fetchProject({ interaction: "timer" });
+      const poll = async self => {
+        if (networkActivity.active)
+          await self.fetchProject({ interaction: "timer" });
         self._poll = setTimeout(() => poll(self), PROJECTS_FETCH_PERIOD);
       };
 
@@ -152,8 +176,11 @@ export const AppStore = types
     },
 
     afterCreate() {
+      console.log("[AppStore] afterCreate hook fired.");
       networkActivity?.destroy();
       networkActivity = new ActivityObserver();
+      self.fetchCurrentUser();
+      // self.fetchData({});
     },
 
     beforeDestroy() {
@@ -172,7 +199,7 @@ export const AppStore = types
     },
 
     removeAction(id) {
-      const action = self.availableActions.find((action) => action.id === id);
+      const action = self.availableActions.find(action => action.id === id);
 
       if (action) destroy(action);
     },
@@ -201,13 +228,13 @@ export const AppStore = types
       self.toolbar = toolbarString;
     },
 
-    setTask: flow(function* ({ taskID, annotationID, pushState }) {
+    setTask: flow(function*({ taskID, annotationID, pushState }) {
       if (pushState !== false) {
         History.navigate({
           task: taskID,
           annotation: annotationID ?? null,
           interaction: null,
-          region: null,
+          region: null
         });
       } else if (isFF(FF_REGION_VISIBILITY_FROM_URL)) {
         const { task, region, annotation } = History.getParams();
@@ -215,9 +242,9 @@ export const AppStore = types
           {
             task,
             region,
-            annotation,
+            annotation
           },
-          true,
+          true
         );
       }
 
@@ -227,7 +254,7 @@ export const AppStore = types
 
       if (self.mode === "labelstream") {
         yield self.taskStore.loadNextTask({
-          select: !!taskID && !!annotationID,
+          select: !!taskID && !!annotationID
         });
       }
 
@@ -238,7 +265,7 @@ export const AppStore = types
       }
 
       const taskPromise = self.taskStore.loadTask(taskID, {
-        select: !!taskID && !!annotationID,
+        select: !!taskID && !!annotationID
       });
 
       // wait for the task to be loaded and LSF to be initialized
@@ -246,7 +273,7 @@ export const AppStore = types
         // wait for self.LSF to be initialized with currentAnnotation
         let maxWait = 1000;
         while (!self.LSF?.currentAnnotation && maxWait > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 1));
+          await new Promise(resolve => setTimeout(resolve, 1));
           maxWait -= 1;
         }
 
@@ -257,17 +284,28 @@ export const AppStore = types
           self.LSF?.setLSFTask(self.taskStore.selected, id);
 
           if (isFF(FF_REGION_VISIBILITY_FROM_URL)) {
-            const { annotation: annIDFromUrl, region: regionIDFromUrl } = History.getParams();
+            const {
+              annotation: annIDFromUrl,
+              region: regionIDFromUrl
+            } = History.getParams();
             const annotationStore = self.LSF?.lsf?.annotationStore;
 
             if (annIDFromUrl && annotationStore) {
-              const lsfAnnotation = [...annotationStore.annotations, ...annotationStore.predictions].find((a) => {
+              const lsfAnnotation = [
+                ...annotationStore.annotations,
+                ...annotationStore.predictions
+              ].find(a => {
                 return a.pk === annIDFromUrl || a.id === annIDFromUrl;
               });
 
               if (lsfAnnotation) {
                 const annID = lsfAnnotation.pk ?? lsfAnnotation.id;
-                self.LSF?.setLSFTask(self.taskStore.selected, annID, undefined, lsfAnnotation.type === "prediction");
+                self.LSF?.setLSFTask(
+                  self.taskStore.selected,
+                  annID,
+                  undefined,
+                  lsfAnnotation.type === "prediction"
+                );
               }
             }
             if (regionIDFromUrl) {
@@ -288,6 +326,61 @@ export const AppStore = types
 
     setLoadingData(value) {
       self.loadingData = value;
+    },
+
+    setCurrentUser(userDataSnapshot) {
+      if (userDataSnapshot && Object.keys(userDataSnapshot).length > 0) {
+        // Ensure User model's preProcessSnapshot (if any) is compatible
+        // with the structure of userDataSnapshot (e.g., camelCasing keys like is_staff to isStaff)
+        let isStaffVal = false;
+        if (
+          self.currentUser &&
+          String(self.currentUser.id) === String(userDataSnapshot.id)
+        ) {
+          // If currentUser exists and is the same user, update it by applying the new snapshot
+          // Note: applySnapshot needs to be imported from "mobx-state-tree"
+          // For now, let's keep it simple and just re-create if not using applySnapshot yet.
+          // To use applySnapshot effectively, make sure User model has an identifier.
+          // applySnapshot(self.currentUser, userDataSnapshot); // Ideal for updates
+          // Fallback to re-creation for simplicity if applySnapshot is not set up or causes issues:
+          // self.currentUser = User.create(userDataSnapshot);
+          applySnapshot(self.currentUser, userDataSnapshot); // Ideal for updates
+          isStaffVal = self.currentUser.isStaff;
+          console.log("Current user (AppStore) updated:", self.currentUser);
+        } else {
+          // Otherwise, create a new User instance for currentUser
+          self.currentUser = User.create(userDataSnapshot);
+          isStaffVal = self.currentUser.isStaff;
+          console.log("Current user (AppStore) set:", self.currentUser);
+        }
+
+        try {
+          localStorage.setItem(
+            LOCAL_STORAGE_IS_STAFF_KEY,
+            JSON.stringify(!!isStaffVal)
+          );
+          console.log("Is thisloggin?");
+        } catch (e) {
+          console.error(
+            "[AppStore] Failed to save isStaff to localStorage: ",
+            e
+          );
+        }
+      } else {
+        self.currentUser = null; // Set to null if snapshot is empty or invalid
+        console.warn(
+          "setCurrentUser (AppStore) called with null or empty data."
+        );
+        try {
+          localStorage.removeItem(LOCALSTORAGE_IS_STAFF_KEY);
+          console.log("[AppStore] isStaff removed from localStorage.");
+        } catch (e) {
+          console.error(
+            "[AppStore] Failed to remove isStaff from localStorage:",
+            e
+          );
+        }
+      }
     },
 
     unsetTask(options) {
@@ -333,14 +426,18 @@ export const AppStore = types
         }
       };
 
-      if (isFF(FF_DEV_2887) && self.LSF?.lsf?.annotationStore?.selected?.commentStore?.hasUnsaved) {
+      if (
+        isFF(FF_DEV_2887) &&
+        self.LSF?.lsf?.annotationStore?.selected?.commentStore?.hasUnsaved
+      ) {
         Modal.confirm({
           title: "You have unsaved changes",
-          body: "There are comments which are not persisted. Please submit the annotation. Continuing will discard these comments.",
+          body:
+            "There are comments which are not persisted. Please submit the annotation. Continuing will discard these comments.",
           onOk() {
             nextAction();
           },
-          okText: "Discard and continue",
+          okText: "Discard and continue"
         });
         return;
       }
@@ -358,17 +455,17 @@ export const AppStore = types
 
         if (item?.id && !item.isSelected) {
           const labelingParams = {
-            pushState: options?.pushState,
+            pushState: options?.pushState
           };
 
           if (isDefined(item.task_id)) {
             Object.assign(labelingParams, {
               annotationID: item.id,
-              taskID: item.task_id,
+              taskID: item.task_id
             });
           } else {
             Object.assign(labelingParams, {
-              taskID: item.id,
+              taskID: item.id
             });
           }
 
@@ -378,14 +475,18 @@ export const AppStore = types
         }
       };
 
-      if (isFF(FF_DEV_2887) && self.LSF?.lsf?.annotationStore?.selected?.commentStore?.hasUnsaved) {
+      if (
+        isFF(FF_DEV_2887) &&
+        self.LSF?.lsf?.annotationStore?.selected?.commentStore?.hasUnsaved
+      ) {
         Modal.confirm({
           title: "You have unsaved changes",
-          body: "There are comments which are not persisted. Please submit the annotation. Continuing will discard these comments.",
+          body:
+            "There are comments which are not persisted. Please submit the annotation. Continuing will discard these comments.",
           onOk() {
             nextAction();
           },
-          okText: "Discard and continue",
+          okText: "Discard and continue"
         });
         return;
       }
@@ -395,14 +496,23 @@ export const AppStore = types
 
     confirmLabelingConfigured() {
       if (!self.labelingIsConfigured) {
-        Modal.confirm({
-          title: "You're almost there!",
-          body: "Before you can annotate the data, set up labeling configuration",
-          onOk() {
-            self.SDK.invoke("settingsClicked");
-          },
-          okText: "Go to setup",
-        });
+        if (self.currentUser.isStaff) {
+          Modal.confirm({
+            title: "You're almost there!",
+            body:
+              "Before you can annotate the data, set up labeling configuration",
+            onOk() {
+              self.SDK.invoke("settingsClicked");
+            },
+            okText: "Go to setup"
+          });
+        } else {
+          Modal.confirm({
+            title: "Labeling Not Ready",
+            body: "Labeling isn't configured. Contact an administrator.",
+            okText: "OK"
+          });
+        }
         return false;
       }
       return true;
@@ -440,7 +550,7 @@ export const AppStore = types
 
         self.viewsStore.setSelected(Number.isNaN(tabId) ? tab : tabId, {
           pushState: false,
-          createDefault: false,
+          createDefault: false
         });
       }
 
@@ -475,7 +585,7 @@ export const AppStore = types
       self.loading = value;
     },
 
-    fetchProject: flow(function* (options = {}) {
+    fetchProject: flow(function*(options = {}) {
       self.projectFetch = options.force === true;
 
       const isTimer = options.interaction === "timer";
@@ -490,16 +600,17 @@ export const AppStore = types
                       "task_number",
                       "annotation_count",
                       "num_tasks_with_annotations",
-                      "queue_total",
-                    ].join(","),
+                      "queue_total"
+                    ].join(",")
                   }
-                : null),
+                : null)
             }
           : null;
 
       try {
         const newProject = yield self.apiCall("project", params);
-        const hasExistingProjectData = Object.entries(self.project ?? {}).length > 0;
+        const hasExistingProjectData =
+          Object.entries(self.project ?? {}).length > 0;
         const hasNewProjectData = Object.entries(newProject ?? {}).length > 0;
 
         self.needsDataFetch =
@@ -507,12 +618,16 @@ export const AppStore = types
             ? self.project.task_count !== newProject.task_count ||
               self.project.task_number !== newProject.task_number ||
               self.project.annotation_count !== newProject.annotation_count ||
-              self.project.num_tasks_with_annotations !== newProject.num_tasks_with_annotations
+              self.project.num_tasks_with_annotations !==
+                newProject.num_tasks_with_annotations
             : false;
 
         if (options.interaction === "timer") {
           self.project = Object.assign(self.project ?? {}, newProject ?? {});
-        } else if (JSON.stringify(newProject ?? {}) !== JSON.stringify(self.project ?? {})) {
+        } else if (
+          JSON.stringify(newProject ?? {}) !==
+          JSON.stringify(self.project ?? {})
+        ) {
           self.project = newProject;
         }
         if (isFF(FF_LOPS_E_3)) {
@@ -527,7 +642,7 @@ export const AppStore = types
         if (options.interaction !== "timer") {
           self.crash({
             error: `Project ID: ${self.SDK.projectId} does not exist or is no longer available`,
-            redirect: true,
+            redirect: true
           });
         }
         return false;
@@ -536,23 +651,62 @@ export const AppStore = types
       return true;
     }),
 
-    fetchActions: flow(function* () {
+    fetchActions: flow(function*() {
       const serverActions = yield self.apiCall("actions");
 
-      const actions = (serverActions ?? []).map((action) => {
+      const actions = (serverActions ?? []).map(action => {
         return [action, undefined];
       });
 
       self.SDK.updateActions(actions);
     }),
 
-    fetchUsers: flow(function* () {
+    fetchUsers: flow(function*() {
       const list = yield self.apiCall("users", { __useQueryCache: 60 * 1000 });
 
       self.users.push(...list);
     }),
 
-    fetchData: flow(function* ({ isLabelStream } = {}) {
+    fetchCurrentUser: flow(function*() {
+      self.setLoading(true); // Optionally set a global loading state
+      console.log("[AppStore] Fetching current user...");
+      try {
+        // Using global fetch as this endpoint might not be in the standard API proxy config
+        // or might require different handling (e.g., credentials).
+        // Ensure this path is correct and reachable from your frontend.
+        const response = yield fetch("/api/current-user/whoami", {
+          // Add headers or credentials if required by your API
+          // headers: { Authorization: `Bearer ${token}` },
+          // credentials: "include" // If cookies are involved
+        });
+
+        if (!response.ok) {
+          // Handle non-successful responses (e.g., 401, 403, 404, 500)
+          console.error(
+            `[AppStore] Failed to fetch current user. Status: ${response.status}`,
+            yield response.text() // Log response body for debugging
+          );
+          self.setCurrentUser(null); // Clear current user on failure
+          // Optionally, set an error state on the store: self.serverError.set("fetchCurrentUser", { ... });
+          return; // Exit the flow
+        }
+
+        const currentUserData = yield response.json();
+        console.log("[AppStore] Current user data received:", currentUserData);
+
+        // Pass the fetched data to the action that sets it on the store
+        self.setCurrentUser(currentUserData);
+      } catch (error) {
+        console.error("[AppStore] Error fetching current user:", error);
+        self.setCurrentUser(null); // Clear current user on error
+        // Optionally, set an error state: self.serverError.set("fetchCurrentUser", { error });
+      } finally {
+        // self.setLoading(false); // Reset global loading state
+        self.loadingCurrentUser = false;
+      }
+    }),
+
+    fetchData: flow(function*({ isLabelStream } = {}) {
       self.setLoading(true);
 
       const { tab, task, labeling, query } = History.getParams();
@@ -566,16 +720,20 @@ export const AppStore = types
           requests.push(self.fetchActions());
         }
 
-        if (self.SDK.settings?.onlyVirtualTabs && self.project?.show_annotation_history && !task) {
+        if (
+          self.SDK.settings?.onlyVirtualTabs &&
+          self.project?.show_annotation_history &&
+          !task
+        ) {
           requests.push(
             self.viewsStore.addView(
               {
                 virtual: true,
                 projectId: self.SDK.projectId,
-                tab,
+                tab
               },
-              { autosave: false, reload: false },
-            ),
+              { autosave: false, reload: false }
+            )
           );
         } else if (self.SDK.type === "labelops") {
           requests.push(
@@ -583,10 +741,10 @@ export const AppStore = types
               {
                 virtual: false,
                 projectId: self.SDK.projectId,
-                tab,
+                tab
               },
-              { autosave: false, autoSelect: true, reload: true },
-            ),
+              { autosave: false, autoSelect: true, reload: true }
+            )
           );
         } else {
           requests.push(self.viewsStore.fetchTabs(tab, task, labeling));
@@ -618,14 +776,15 @@ export const AppStore = types
      * @param {object} body for POST/PATCH requests
      * @param {{ errorHandler?: fn, headers?: object, allowToCancel?: boolean }} [options] additional options like errorHandler
      */
-    apiCall: flow(function* (methodName, params, body, options) {
+    apiCall: flow(function*(methodName, params, body, options) {
       const isAllowCancel = options?.allowToCancel;
       const controller = new AbortController();
       const signal = controller.signal;
       const apiTransform = self.SDK.apiTransform?.[methodName];
       const requestParams = apiTransform?.params?.(params) ?? params ?? {};
       const requestBody = apiTransform?.body?.(body) ?? body ?? {};
-      const requestHeaders = apiTransform?.headers?.(options?.headers) ?? options?.headers ?? {};
+      const requestHeaders =
+        apiTransform?.headers?.(options?.headers) ?? options?.headers ?? {};
       const requestKey = `${methodName}_${JSON.stringify(params || {})}`;
 
       if (isAllowCancel) {
@@ -640,7 +799,7 @@ export const AppStore = types
       const result = yield self.API[methodName](requestParams, {
         headers: requestHeaders,
         body: requestBody.body ?? requestBody,
-        options,
+        options
       });
 
       if (isAllowCancel) {
@@ -649,7 +808,12 @@ export const AppStore = types
       }
       // We don't want to show errors when loading data in polling mode
       // we will just allow it to try again later
-      if (result.error && result.status !== 404 && !signal.aborted && params.interaction !== "timer") {
+      if (
+        result.error &&
+        result.status !== 404 &&
+        !signal.aborted &&
+        params.interaction !== "timer"
+      ) {
         if (options?.errorHandler?.(result)) {
           return result;
         }
@@ -658,7 +822,7 @@ export const AppStore = types
           try {
             self.serverError.set(methodName, {
               error: "Something went wrong",
-              response: result.response,
+              response: result.response
             });
           } catch {
             // ignore
@@ -667,7 +831,7 @@ export const AppStore = types
 
         console.warn({
           message: "Error occurred when loading data",
-          description: result?.response?.detail ?? result.error,
+          description: result?.response?.detail ?? result.error
         });
 
         self.SDK.invoke("error", result);
@@ -687,10 +851,11 @@ export const AppStore = types
       return result;
     }),
 
-    invokeAction: flow(function* (actionId, options = {}) {
+    invokeAction: flow(function*(actionId, options = {}) {
       const view = self.currentView ?? {};
 
-      const needsLock = self.availableActions.findIndex((a) => a.id === actionId) >= 0;
+      const needsLock =
+        self.availableActions.findIndex(a => a.id === actionId) >= 0;
 
       const { selected } = view;
       const actionCallback = self.SDK.getAction(actionId);
@@ -706,8 +871,8 @@ export const AppStore = types
         selectedItems: selected?.snapshot ?? { all: false, included: [] },
         filters: {
           conjunction: view.conjunction ?? "and",
-          items: view.serializedFilters ?? [],
-        },
+          items: view.serializedFilters ?? []
+        }
       };
 
       if (actionId === "next_task") {
@@ -717,7 +882,10 @@ export const AppStore = types
         if (isAllLabelStreamMode && !isSelectAll) {
           delete actionParams.filters;
 
-          if (actionParams.selectedItems.all === false && actionParams.selectedItems.included.length === 0) {
+          if (
+            actionParams.selectedItems.all === false &&
+            actionParams.selectedItems.included.length === 0
+          ) {
             delete actionParams.selectedItems;
             delete actionParams.ordering;
           }
@@ -731,7 +899,7 @@ export const AppStore = types
       }
 
       const requestParams = {
-        id: actionId,
+        id: actionId
       };
 
       if (isDefined(view.id) && !view?.virtual) {
@@ -743,11 +911,14 @@ export const AppStore = types
       }
 
       const result = yield self.apiCall("invokeAction", requestParams, {
-        body: actionParams,
+        body: actionParams
       });
 
       if (result.async) {
-        self.SDK.invoke("toast", { message: "Your action is being processed in the background.", type: "info" });
+        self.SDK.invoke("toast", {
+          message: "Your action is being processed in the background.",
+          type: "info"
+        });
       }
 
       if (result.reload) {
@@ -786,5 +957,5 @@ export const AppStore = types
       }
 
       clearTimeout(self._poll);
-    },
+    }
   }));
