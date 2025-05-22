@@ -12,11 +12,12 @@ export const User = types
     lastActivity: types.string,
     avatar: types.maybeNull(types.string),
     initials: types.string,
+    isStaff: types.optional(types.boolean, false)
   })
-  .views((self) => ({
+  .views(self => ({
     get fullName() {
       return [self.firstName, self.lastName]
-        .filter((n) => !!n)
+        .filter(n => !!n)
         .join(" ")
         .trim();
     },
@@ -24,7 +25,11 @@ export const User = types
     get displayName() {
       return self.fullName || (self.username ? self.username : self.email);
     },
+
+    get adminStatus() {
+      return self.isStaff;
+    }
   }))
-  .preProcessSnapshot((sn) => {
+  .preProcessSnapshot(sn => {
     return camelizeKeys(sn);
   });

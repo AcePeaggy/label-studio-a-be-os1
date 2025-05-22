@@ -3,7 +3,10 @@
 import { createBrowserHistory } from "history";
 import { render } from "react-dom";
 import { Router } from "react-router-dom";
-import { LEAVE_BLOCKER_KEY, leaveBlockerCallback } from "../components/LeaveBlocker/LeaveBlocker";
+import {
+  LEAVE_BLOCKER_KEY,
+  leaveBlockerCallback
+} from "../components/LeaveBlocker/LeaveBlocker";
 import { initSentry } from "../config/Sentry";
 import { ApiProvider, useAPI } from "../providers/ApiProvider";
 import { AppStoreProvider } from "../providers/AppStoreProvider";
@@ -11,7 +14,11 @@ import { ConfigProvider } from "../providers/ConfigProvider";
 import { MultiProvider } from "../providers/MultiProvider";
 import { ProjectProvider } from "../providers/ProjectProvider";
 import { RoutesProvider } from "../providers/RoutesProvider";
-import { DRAFT_GUARD_KEY, DraftGuard, draftGuardCallback } from "../components/DraftGuard/DraftGuard";
+import {
+  DRAFT_GUARD_KEY,
+  DraftGuard,
+  draftGuardCallback
+} from "../components/DraftGuard/DraftGuard";
 import { AsyncPage } from "./AsyncPage/AsyncPage";
 import ErrorBoundary from "./ErrorBoundary";
 import { FF_UNSAVED_CHANGES, isFF } from "../utils/feature-flags";
@@ -22,12 +29,23 @@ import { CurrentUserProvider } from "../providers/CurrentUser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@humansignal/core/lib/utils/query-client";
 import { RootPage } from "./RootPage";
+// import { StoreProvider } from "../providers/StoreProvider";
 import { ff } from "@humansignal/core";
 import "@humansignal/ui/src/tailwind.css";
 import "./App.scss";
 
 const baseURL = new URL(APP_SETTINGS.hostname || location.origin);
 export const UNBLOCK_HISTORY_MESSAGE = "UNBLOCK_HISTORY";
+<<<<<<< HEAD
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false
+    }
+  }
+});
+=======
+>>>>>>> 1e5cfc91c7d6761ace37037c0315ad5e89bf2058
 
 const browserHistory = createBrowserHistory({
   basename: baseURL.pathname || "/",
@@ -37,10 +55,14 @@ const browserHistory = createBrowserHistory({
     // we need to have some flag that can be checked for preventing related actions
     // `isBlocking` flag is used for this purpose
     browserHistory.isBlocking = true;
-    const callbackWrapper = (result) => {
+    const callbackWrapper = result => {
       browserHistory.isBlocking = false;
       callback(result);
-      isFF(FF_UNSAVED_CHANGES) && window.postMessage({ source: "label-studio", payload: UNBLOCK_HISTORY_MESSAGE });
+      isFF(FF_UNSAVED_CHANGES) &&
+        window.postMessage({
+          source: "label-studio",
+          payload: UNBLOCK_HISTORY_MESSAGE
+        });
     };
     if (message === DRAFT_GUARD_KEY) {
       draftGuardCallback.current = callbackWrapper;
@@ -49,7 +71,7 @@ const browserHistory = createBrowserHistory({
     } else {
       callbackWrapper(window.confirm(message));
     }
-  },
+  }
 });
 
 window.LSH = browserHistory;
@@ -59,6 +81,7 @@ initSentry(browserHistory);
 const App = ({ content }) => {
   return (
     <ErrorBoundary>
+      {/* <StoreProvider> */}
       <Router history={browserHistory}>
         <MultiProvider
           providers={[
@@ -71,7 +94,7 @@ const App = ({ content }) => {
             <RoutesProvider key="rotes" />,
             <ProjectProvider key="project" />,
             <CurrentUserProvider key="current-user" />,
-            ff.isActive(ff.FF_PRODUCT_TOUR) && <TourProvider useAPI={useAPI} />,
+            ff.isActive(ff.FF_PRODUCT_TOUR) && <TourProvider useAPI={useAPI} />
           ].filter(Boolean)}
         >
           <AsyncPage>
@@ -81,6 +104,7 @@ const App = ({ content }) => {
           </AsyncPage>
         </MultiProvider>
       </Router>
+      {/* </StoreProvider> */}
     </ErrorBoundary>
   );
 };

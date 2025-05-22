@@ -12,8 +12,9 @@ export const UserExtended = types
     avatar: types.maybeNull(types.string),
     initials: types.maybeNull(types.string),
     phone: types.maybeNull(types.string),
+    isStaff: types.optional(types.boolean, false)
   })
-  .preProcessSnapshot((sn) => {
+  .preProcessSnapshot(sn => {
     return camelizeKeys(sn ?? {});
   });
 
@@ -38,13 +39,16 @@ const UserStore = types
      * Last name of user
      */
     lastName: types.maybeNull(types.string),
+
+    isStaff: types.optional(types.boolean, false)
   })
-  .views((self) => ({
+  .views(self => ({
     get displayName() {
-      if (self.firstName || self.lastName) return `${self.firstName} ${self.lastName}`;
+      if (self.firstName || self.lastName)
+        return `${self.firstName} ${self.lastName}`;
 
       return "";
-    },
+    }
   }));
 
 export default UserStore;

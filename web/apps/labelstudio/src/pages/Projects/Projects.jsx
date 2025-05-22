@@ -28,7 +28,9 @@ export const ProjectsPage = () => {
   const [currentPage, setCurrentPage] = useState(getCurrentPage());
   const [totalItems, setTotalItems] = useState(1);
   const setContextProps = useContextProps();
-  const defaultPageSize = Number.parseInt(localStorage.getItem("pages:projects-list") ?? 30);
+  const defaultPageSize = Number.parseInt(
+    localStorage.getItem("pages:projects-list") ?? 30
+  );
 
   const [modal, setModal] = React.useState(false);
 
@@ -36,7 +38,10 @@ export const ProjectsPage = () => {
 
   const closeModal = () => setModal(false);
 
-  const fetchProjects = async (page = currentPage, pageSize = defaultPageSize) => {
+  const fetchProjects = async (
+    page = currentPage,
+    pageSize = defaultPageSize
+  ) => {
     setNetworkState("loading");
     abortController.renew(); // Cancel any in flight requests
 
@@ -49,13 +54,13 @@ export const ProjectsPage = () => {
       "created_at",
       "color",
       "is_published",
-      "assignment_settings",
+      "assignment_settings"
     ].join(",");
 
     const data = await api.callApi("projects", {
       params: requestParams,
       signal: abortController.controller.current.signal,
-      errorFilter: (e) => e.error.includes("aborted"),
+      errorFilter: e => e.error.includes("aborted")
     });
 
     setTotalItems(data?.count ?? 1);
@@ -75,24 +80,24 @@ export const ProjectsPage = () => {
             "total_annotations_number",
             "total_predictions_number",
             "ground_truth_number",
-            "finished_task_number",
+            "finished_task_number"
           ].join(","),
-          page_size: pageSize,
+          page_size: pageSize
         },
         signal: abortController.controller.current.signal,
-        errorFilter: (e) => e.error.includes("aborted"),
+        errorFilter: e => e.error.includes("aborted")
       });
 
       if (additionalData?.results?.length) {
-        setProjectsList((prev) =>
-          additionalData.results.map((project) => {
+        setProjectsList(prev =>
+          additionalData.results.map(project => {
             const prevProject = prev.find(({ id }) => id === project.id);
 
             return {
               ...prevProject,
-              ...project,
+              ...project
             };
-          }),
+          })
         );
       }
     }
@@ -153,9 +158,9 @@ ProjectsPage.routes = ({ store }) => [
     },
     pages: {
       DataManagerPage,
-      SettingsPage,
-    },
-  },
+      SettingsPage
+    }
+  }
 ];
 ProjectsPage.context = ({ openModal, showButton }) => {
   if (!showButton) return null;

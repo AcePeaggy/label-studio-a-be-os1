@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Button } from "../../../components";
 import { Description } from "../../../components/Description/Description";
 import { Input } from "../../../components/Form";
@@ -8,7 +8,11 @@ import { Space } from "../../../components/Space/Space";
 import { useAPI } from "../../../providers/ApiProvider";
 import { useConfig } from "../../../providers/ConfigProvider";
 import { Block, Elem } from "../../../utils/bem";
-import { FF_AUTH_TOKENS, FF_LSDV_E_297, isFF } from "../../../utils/feature-flags";
+import {
+  FF_AUTH_TOKENS,
+  FF_LSDV_E_297,
+  isFF
+} from "../../../utils/feature-flags";
 import "./PeopleInvitation.scss";
 import { PeopleList } from "./PeopleList";
 import "./PeoplePage.scss";
@@ -19,6 +23,27 @@ import { useToast } from "@humansignal/ui";
 import { InviteLink } from "./InviteLink";
 import { debounce } from "@humansignal/core/lib/utils/debounce";
 
+const LOCALSTORAGE_IS_STAFF_KEY = "user_is_staff";
+
+const getIsStaffFromLocalStorage = () => {
+  try {
+    const storedValue = localStorage.getItem(LOCALSTORAGE_IS_STAFF_KEY);
+    if (storedValue === null) {
+      // console.log("[PeoplePage] isStaff not found in localStorage, defaulting to false.");
+      return false;
+    }
+    const parsedValue = JSON.parse(storedValue);
+    // console.log(`[PeoplePage] isStaff read from localStorage: ${parsedValue}`);
+    return parsedValue === true;
+  } catch (e) {
+    console.error(
+      "[PeoplePage] Failed to read/parse isStaff from localStorage, defaulting to false.",
+      e
+    );
+    return false;
+  }
+};
+
 const InvitationModal = ({ link }) => {
   return (
     <Block name="invite">
@@ -26,19 +51,27 @@ const InvitationModal = ({ link }) => {
         value={link}
         style={{ width: "100%" }}
         readOnly
-        onCopy={debounce(() => __lsa("organization.add_people.manual_copy_link"), 1000)}
-        onSelect={debounce(() => __lsa("organization.add_people.select_link"), 1000)}
+        onCopy={debounce(
+          () => __lsa("organization.add_people.manual_copy_link"),
+          1000
+        )}
+        onSelect={debounce(
+          () => __lsa("organization.add_people.select_link"),
+          1000
+        )}
       />
 
       <Description style={{ marginTop: 16 }}>
-        Invite people to join your Label Studio instance. People that you invite have full access to all of your
-        projects.{" "}
+        Invite people to join your Label Studio instance. People that you invite
+        have full access to all of your projects.{" "}
         <a
           href="https://labelstud.io/guide/signup.html"
           target="_blank"
           rel="noreferrer"
           onClick={() =>
-            __lsa("docs.organization.add_people.learn_more", { href: "https://labelstud.io/guide/signup.html" })
+            __lsa("docs.organization.add_people.learn_more", {
+              href: "https://labelstud.io/guide/signup.html"
+            })
           }
         >
           Learn more
@@ -60,13 +93,33 @@ export const PeoplePage = () => {
 
   const [link, setLink] = useState();
 
+  const [isStaff, setIsStaff] = useState(getIsStaffFromLocalStorage());
+
+  useEffect(() => {
+    const updateStaffStatusFromStorage = () => {
+      const valueFromStorage = getIsStaffFromLocalStorage();
+      if (valueFromStorage !== isStaff) {
+        // console.log("[PeoplePage] Updating isStaff state based on localStorage change or focus.");
+        setIsStaff(valueFromStorage);
+      }
+    };
+    window.addEventListener("storage", updateStaffStatusFromStorage);
+    window.addEventListener("focus", updateStaffStatusFromStorage);
+    updateStaffStatusFromStorage();
+
+    return () => {
+      window.removeEventListener("storage", updateStaffStatusFromStorage);
+      window.removeEventListener("focus", updateStaffStatusFromStorage);
+    };
+  }, [isStaff]);
+
   const selectUser = useCallback(
-    (user) => {
+    user => {
       setSelectedUser(user);
 
       localStorage.setItem("selectedUser", user?.id);
     },
-    [setSelectedUser],
+    [setSelectedUser]
   );
 
   const apiTokensSettingsModalProps = useMemo(
@@ -80,15 +133,20 @@ export const PeoplePage = () => {
             apiSettingsModal.current?.close();
           }}
         />
-      ),
+      )
     }),
-    [],
+    []
   );
 
   const showApiTokenSettingsModal = useCallback(() => {
     apiSettingsModal.current = modal(apiTokensSettingsModalProps);
     __lsa("organization.token_settings");
   }, [apiTokensSettingsModalProps]);
+
+  const handleAddPeopleClick = useCallback(() => {
+    if (!isStaff) return;
+    setInvitationOpen(true);
+  }, [isStaff]);
 
   const defaultSelected = useMemo(() => {
     return localStorage.getItem("selectedUser");
@@ -99,12 +157,21 @@ export const PeoplePage = () => {
       <Elem name="controls">
         <Space spread>
           <Space />
-
           <Space>
-            {isFF(FF_AUTH_TOKENS) && <Button onClick={showApiTokenSettingsModal}>API Tokens Settings</Button>}
-            <Button icon={<IconPlus />} primary onClick={() => setInvitationOpen(true)}>
-              Add People
-            </Button>
+            {isStaff && isFF(FF_AUTH_TOKENS) && (
+              <Button onClick={showApiTokenSettingsModal}>
+                API Tokens Settings
+              </Button>
+            )}
+            {isStaff && (
+              <Button
+                icon={<IconPlus />}
+                primary
+                onClick={handleAddPeopleClick}
+              >
+                Add People
+              </Button>
+            )}
           </Space>
         </Space>
       </Elem>
@@ -112,7 +179,7 @@ export const PeoplePage = () => {
         <PeopleList
           selectedUser={selectedUser}
           defaultSelected={defaultSelected}
-          onSelect={(user) => selectUser(user)}
+          onSelect={user => selectUser(user)}
         />
 
         {selectedUser ? (

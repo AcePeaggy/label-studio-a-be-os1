@@ -1,4 +1,11 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { generatePath, useHistory } from "react-router";
 import { NavLink } from "react-router-dom";
 import { Spinner } from "../../components";
@@ -17,11 +24,16 @@ import { APIConfig } from "./api-config";
 import { ToastContext, ToastType } from "@humansignal/ui";
 
 import "./DataManager.scss";
+import { observer } from "mobx-react";
 
-const loadDependencies = () => [import("@humansignal/datamanager"), import("@humansignal/editor")];
+const loadDependencies = () => [
+  import("@humansignal/datamanager"),
+  import("@humansignal/editor")
+];
 
 const initializeDataManager = async (root, props, params) => {
-  if (!window.LabelStudio) throw Error("Label Studio Frontend doesn't exist on the page");
+  if (!window.LabelStudio)
+    throw Error("Label Studio Frontend doesn't exist on the page");
   if (!root && root.dataset.dmInitialized) return;
 
   root.dataset.dmInitialized = true;
@@ -42,13 +54,13 @@ const initializeDataManager = async (root, props, params) => {
       export: true,
       backButton: false,
       labelingHeader: false,
-      autoAnnotation: params.autoAnnotation,
+      autoAnnotation: params.autoAnnotation
     },
     labelStudio: {
-      keymap: window.APP_SETTINGS.editor_keymap,
+      keymap: window.APP_SETTINGS.editor_keymap
     },
     ...props,
-    ...settings,
+    ...settings
   };
 
   return new window.DataManager(dmConfig);
@@ -68,7 +80,9 @@ export const DataManagerPage = ({ ...props }) => {
   const { project } = useProject();
   const setContextProps = useContextProps();
   const [crashed, setCrashed] = useState(false);
-  const [loading, setLoading] = useState(!window.DataManager || !window.LabelStudio);
+  const [loading, setLoading] = useState(
+    !window.DataManager || !window.LabelStudio
+  );
   const dataManagerRef = useRef();
   const projectId = project?.id;
 
@@ -80,22 +94,24 @@ export const DataManagerPage = ({ ...props }) => {
     if (dataManagerRef.current) return;
 
     const mlBackends = await api.callApi("mlBackends", {
-      params: { project: project.id },
+      params: { project: project.id }
     });
 
-    const interactiveBacked = (mlBackends ?? []).find(({ is_interactive }) => is_interactive);
+    const interactiveBacked = (mlBackends ?? []).find(
+      ({ is_interactive }) => is_interactive
+    );
 
     const dataManager = (dataManagerRef.current =
       dataManagerRef.current ??
       (await initializeDataManager(root.current, props, {
         ...params,
         project,
-        autoAnnotation: isDefined(interactiveBacked),
+        autoAnnotation: isDefined(interactiveBacked)
       })));
 
     Object.assign(window, { dataManager });
 
-    dataManager.on("crash", (details) => {
+    dataManager.on("crash", details => {
       const error = details?.error;
       const isMissingTaskError = error?.startsWith("Task ID:");
       const isMissingProjectError = error?.startsWith("Project ID:");
@@ -108,7 +124,7 @@ export const DataManagerPage = ({ ...props }) => {
         toast.show({
           message,
           type: ToastType.error,
-          duration: 10000,
+          duration: 10000
         });
       }
 
@@ -131,7 +147,7 @@ export const DataManagerPage = ({ ...props }) => {
       history.push(buildLink("/data/export", { id: params.id }));
     });
 
-    dataManager.on("error", (response) => {
+    dataManager.on("error", response => {
       api.handleError(response);
     });
 
@@ -139,7 +155,7 @@ export const DataManagerPage = ({ ...props }) => {
       toast.show({ message, type });
     });
 
-    dataManager.on("navigate", (route) => {
+    dataManager.on("navigate", route => {
       const target = route.replace(/^projects/, "");
 
       if (target) history.push(buildLink(target, { id: params.id }));
@@ -149,15 +165,17 @@ export const DataManagerPage = ({ ...props }) => {
     if (interactiveBacked) {
       dataManager.on("lsf:regionFinishedDrawing", (reg, group) => {
         const { lsf, task, currentAnnotation: annotation } = dataManager.lsf;
-        const ids = group.map((r) => r.cleanId);
-        const result = annotation.serializeAnnotation().filter((res) => ids.includes(res.id));
+        const ids = group.map(r => r.cleanId);
+        const result = annotation
+          .serializeAnnotation()
+          .filter(res => ids.includes(res.id));
 
         const suggestionsRequest = api.callApi("mlInteractive", {
           params: { pk: interactiveBacked.id },
           body: {
             task: task.id,
-            context: { result },
-          },
+            context: { result }
+          }
         });
 
         // we'll check that we are processing the same task
@@ -173,7 +191,7 @@ export const DataManagerPage = ({ ...props }) => {
           }
         });
 
-        lsf.loadSuggestions(wrappedRequest, (response) => {
+        lsf.loadSuggestions(wrappedRequest, response => {
           if (response.data) {
             return response.data.result;
           }
@@ -226,59 +244,79 @@ export const DataManagerPage = ({ ...props }) => {
 DataManagerPage.path = "/data";
 DataManagerPage.pages = {
   ExportPage,
-  ImportModal,
+  ImportModal
 };
-DataManagerPage.context = ({ dmRef }) => {
+DataManagerPage.context = observer(({ dmRef }) => {
   const { project } = useProject();
-  const [mode, setMode] = useState(dmRef?.mode ?? "explorer");
+  const appStore = dmRef?.store;
+  const [mode, setMode] = useState(appStore?.mode ?? dmRef?.mode ?? "explorer");
+
+  const isUserStaff = appStore?.currentUser?.isStaff ?? false;
 
   const links = {
-    "/settings": "Settings",
+    "/settings": "Settings"
   };
 
-  const updateCrumbs = (currentMode) => {
+  const updateCrumbs = useCallback(currentMode => {
     const isExplorer = currentMode === "explorer";
-
     if (isExplorer) {
       deleteCrumb("dm-crumb");
     } else {
       addCrumb({
         key: "dm-crumb",
-        title: "Labeling",
+        title: "Labeling"
       });
     }
-  };
+  }, []);
 
-  const showLabelingInstruction = (currentMode) => {
-    const isLabelStream = currentMode === "labelstream";
-    const { expert_instruction, show_instruction } = project;
+  const showLabelingInstruction = useCallback(
+    currentMode => {
+      const isLabelStream = currentMode === "labelstream";
+      const { expert_instruction, show_instruction } = project ?? {};
 
-    if (isLabelStream && show_instruction && expert_instruction) {
-      modal({
-        title: "Labeling Instructions",
-        body: <div dangerouslySetInnerHTML={{ __html: expert_instruction }} />,
-        style: { width: 680 },
-      });
-    }
-  };
+      if (project && isLabelStream && show_instruction && expert_instruction) {
+        modal({
+          title: "Labeling Instructions",
+          body: (
+            <div dangerouslySetInnerHTML={{ __html: expert_instruction }} />
+          ),
+          style: { width: 680 }
+        });
+      }
+    },
+    [project]
+  );
 
-  const onDMModeChanged = (currentMode) => {
-    setMode(currentMode);
-    updateCrumbs(currentMode);
-    showLabelingInstruction(currentMode);
-  };
+  const onDMModeChanged = useCallback(
+    currentMode => {
+      setMode(currentMode);
+      updateCrumbs(currentMode);
+      showLabelingInstruction(currentMode);
+    },
+    [updateCrumbs, showLabelingInstruction]
+  );
 
   useEffect(() => {
     if (dmRef) {
+      const initialMode = dmRef.mode ?? appStore?.mode ?? "explorer";
+      setMode(initialMode);
+      updateCrumbs(initialMode);
+      showLabelingInstruction(initialMode);
+
       dmRef.on("modeChanged", onDMModeChanged);
+      return () => {
+        dmRef.off?.("modeChanged", onDMModeChanged);
+      };
     }
+  }, [dmRef, appStore, onDMModeChanged, updateCrumbs, showLabelingInstruction]);
 
-    return () => {
-      dmRef?.off?.("modeChanged", onDMModeChanged);
-    };
-  }, [dmRef, project]);
+  if (!project || !project.id || !appStore) {
+    // If project is not loaded, or appStore (via dmRef.store) is not yet available, render nothing.
+    // This prevents errors if dmRef.store is not immediately ready when DataManagerPage.context mounts.
+    return null;
+  }
 
-  return project && project.id ? (
+  return (
     <Space size="small">
       {project.expert_instruction && mode !== "explorer" && (
         <Button
@@ -286,7 +324,13 @@ DataManagerPage.context = ({ dmRef }) => {
           onClick={() => {
             modal({
               title: "Instructions",
-              body: () => <div dangerouslySetInnerHTML={{ __html: project.expert_instruction }} />,
+              body: () => (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: project.expert_instruction
+                  }}
+                />
+              )
             });
           }}
         >
@@ -294,11 +338,17 @@ DataManagerPage.context = ({ dmRef }) => {
         </Button>
       )}
 
-      {Object.entries(links).map(([path, label]) => (
-        <Button key={path} tag={NavLink} size="compact" to={`/projects/${project.id}${path}`} data-external>
-          {label}
+      {isUserStaff && (
+        <Button
+          key="/settings"
+          tag={NavLink}
+          size="compact"
+          to={`/projects/${project.id}/settings`}
+          data-external
+        >
+          Settings
         </Button>
-      ))}
+      )}
     </Space>
-  ) : null;
-};
+  );
+});
