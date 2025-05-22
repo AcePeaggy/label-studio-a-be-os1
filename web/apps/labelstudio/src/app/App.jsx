@@ -27,7 +27,6 @@ import { ToastProvider, ToastViewport } from "@humansignal/ui";
 import { JotaiProvider, JotaiStore } from "../utils/jotai-store";
 import { CurrentUserProvider } from "../providers/CurrentUser";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { QueryClient } from "@tanstack/react-query";
 import { RootPage } from "./RootPage";
 // import { StoreProvider } from "../providers/StoreProvider";
 import { ff } from "@humansignal/core";

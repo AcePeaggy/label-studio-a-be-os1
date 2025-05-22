@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams as useRouterParams } from "react-router";
 import { Redirect } from "react-router-dom";
 import { Button } from "../../components";
@@ -13,6 +13,27 @@ import { SettingsPage } from "../Settings";
 import "./Projects.scss";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { useAbortController } from "@humansignal/core";
+
+const LOCALSTORAGE_IS_STAFF_KEY = "user_is_staff";
+
+const getIsStaffFromLocalStorage = () => {
+  try {
+    const storedValue = localStorage.getItem(LOCALSTORAGE_IS_STAFF_KEY);
+    if (storedValue === null) {
+      // console.log("[EmptyProjectsList] isStaff not found in localStorage, defaulting to false.");
+      return false;
+    }
+    const parsedValue = JSON.parse(storedValue);
+    // console.log(`[EmptyProjectsList] isStaff read from localStorage: ${parsedValue}`);
+    return parsedValue === true;
+  } catch (e) {
+    console.error(
+      "[EmptyProjectsList] Failed to read/parse isStaff from localStorage, defaulting to false.",
+      e
+    );
+    return false;
+  }
+};
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -163,10 +184,34 @@ ProjectsPage.routes = ({ store }) => [
   }
 ];
 ProjectsPage.context = ({ openModal, showButton }) => {
+  const [isStaff, setIsStaff] = useState(getIsStaffFromLocalStorage());
+
+  useEffect(() => {
+    const updateStaffStatusFromStorage = () => {
+      const valueFromStorage = getIsStaffFromLocalStorage();
+      if (valueFromStorage !== isStaff) {
+        // console.log("[EmptyProjectsList] Updating isStaff state based on localStorage change or focus.");
+        setIsStaff(valueFromStorage);
+      }
+    };
+    window.addEventListener("storage", updateStaffStatusFromStorage);
+    window.addEventListener("focus", updateStaffStatusFromStorage);
+    updateStaffStatusFromStorage();
+
+    return () => {
+      window.removeEventListener("storage", updateStaffStatusFromStorage);
+      window.removeEventListener("focus", updateStaffStatusFromStorage);
+    };
+  }, [isStaff]);
+  console.log("isStaff is ", isStaff);
   if (!showButton) return null;
   return (
-    <Button onClick={openModal} look="primary" size="compact">
-      Create
-    </Button>
+    <>
+      {isStaff && (
+        <Button onClick={openModal} look="primary" size="compact">
+          Create
+        </Button>
+      )}
+    </>
   );
 };
