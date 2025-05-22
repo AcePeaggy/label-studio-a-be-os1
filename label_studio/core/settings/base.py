@@ -471,6 +471,7 @@ AVATAR_PATH = "avatars"
 
 SUPPORTED_EXTENSIONS = set(
     [
+<<<<<<< HEAD
         ".bmp",
         ".csv",
         ".flac",
@@ -492,6 +493,30 @@ SUPPORTED_EXTENSIONS = set(
         ".mp4",
         ".webm",
         ".webp",
+=======
+        '.bmp',
+        '.csv',
+        '.flac',
+        '.gif',
+        '.htm',
+        '.html',
+        '.jpg',
+        '.jpeg',
+        '.json',
+        '.m4a',
+        '.mp3',
+        '.ogg',
+        '.png',
+        '.svg',
+        '.tsv',
+        '.txt',
+        '.wav',
+        '.xml',
+        '.mp4',
+        '.webm',
+        '.webp',
+        '.pdf',
+>>>>>>> 1e5cfc91c7d6761ace37037c0315ad5e89bf2058
     ]
 )
 
@@ -604,6 +629,11 @@ STORAGE_PERMISSION = "io_storages.permissions.StoragePermission"
 PROJECT_IMPORT_PERMISSION = "projects.permissions.ProjectImportPermission"
 DELETE_TASKS_ANNOTATIONS_POSTPROCESS = None
 FEATURE_FLAGS_GET_USER_REPR = "core.feature_flags.utils.get_user_repr"
+
+# Test factories
+ORGANIZATION_FACTORY = 'organizations.tests.factories.OrganizationFactory'
+PROJECT_FACTORY = 'projects.tests.factories.ProjectFactory'
+USER_FACTORY = 'users.tests.factories.UserFactory'
 
 
 def project_delete(project):
