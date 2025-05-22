@@ -268,7 +268,7 @@ This software is licensed under the [Apache 2.0 LICENSE](/LICENSE) © [Heartex](
 
 ================================================================================
 
-You can deploy using `docker` just run `docker compose up -d --build`.
+You can deploy using `docker` just run `docker compose up -d`.
 
 The docker build uses volume binded mounts. If deploying using `docker`:
 
