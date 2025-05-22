@@ -26,8 +26,8 @@ import { TourProvider } from "@humansignal/core";
 import { ToastProvider, ToastViewport } from "@humansignal/ui";
 import { JotaiProvider, JotaiStore } from "../utils/jotai-store";
 import { CurrentUserProvider } from "../providers/CurrentUser";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@humansignal/core/lib/utils/query-client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { RootPage } from "./RootPage";
 // import { StoreProvider } from "../providers/StoreProvider";
 import { ff } from "@humansignal/core";
@@ -36,7 +36,6 @@ import "./App.scss";
 
 const baseURL = new URL(APP_SETTINGS.hostname || location.origin);
 export const UNBLOCK_HISTORY_MESSAGE = "UNBLOCK_HISTORY";
-<<<<<<< HEAD
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -44,8 +43,6 @@ const queryClient = new QueryClient({
     }
   }
 });
-=======
->>>>>>> 1e5cfc91c7d6761ace37037c0315ad5e89bf2058
 
 const browserHistory = createBrowserHistory({
   basename: baseURL.pathname || "/",
