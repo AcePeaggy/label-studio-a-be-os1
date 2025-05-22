@@ -128,6 +128,27 @@ const ProjectCard = ({ project }) => {
     return DEFAULT_CARD_COLORS.includes(project.color) ? null : project.color;
   }, [project]);
 
+  const [isStaff, setIsStaff] = useState(getIsStaffFromLocalStorage());
+
+  useEffect(() => {
+    const updateStaffStatusFromStorage = () => {
+      const valueFromStorage = getIsStaffFromLocalStorage();
+      if (valueFromStorage !== isStaff) {
+        // console.log("[EmptyProjectsList] Updating isStaff state based on localStorage change or focus.");
+        setIsStaff(valueFromStorage);
+      }
+    };
+
+    window.addEventListener("storage", updateStaffStatusFromStorage);
+    window.addEventListener("focus", updateStaffStatusFromStorage);
+    updateStaffStatusFromStorage();
+
+    return () => {
+      window.removeEventListener("storage", updateStaffStatusFromStorage);
+      window.removeEventListener("focus", updateStaffStatusFromStorage);
+    };
+  }, [isStaff]);
+
   const projectColors = useMemo(() => {
     const textColor =
       color && chr(color).luminance() > 0.3
@@ -170,20 +191,24 @@ const ProjectCard = ({ project }) => {
                 e.preventDefault();
               }}
             >
-              <Dropdown.Trigger
-                content={
-                  <Menu contextual>
-                    <Menu.Item href={`/projects/${project.id}/settings`}>
-                      Settings
-                    </Menu.Item>
-                    <Menu.Item href={`/projects/${project.id}/data?labeling=1`}>
-                      Label
-                    </Menu.Item>
-                  </Menu>
-                }
-              >
-                <Button size="small" type="text" icon={<IconEllipsis />} />
-              </Dropdown.Trigger>
+              {isStaff && (
+                <Dropdown.Trigger
+                  content={
+                    <Menu contextual>
+                      <Menu.Item href={`/projects/${project.id}/settings`}>
+                        Settings
+                      </Menu.Item>
+                      <Menu.Item
+                        href={`/projects/${project.id}/data?labeling=1`}
+                      >
+                        Label
+                      </Menu.Item>
+                    </Menu>
+                  }
+                >
+                  <Button size="small" type="text" icon={<IconEllipsis />} />
+                </Dropdown.Trigger>
+              )}
             </Elem>
           </Elem>
           <Elem name="summary">
