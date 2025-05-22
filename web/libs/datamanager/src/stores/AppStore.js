@@ -661,8 +661,18 @@ export const AppStore = types
       self.SDK.updateActions(actions);
     }),
 
+<<<<<<< HEAD
     fetchUsers: flow(function*() {
       const list = yield self.apiCall("users", { __useQueryCache: 60 * 1000 });
+=======
+    fetchUsers: flow(function* () {
+      const list = yield self.apiCall("users", {
+        __useQueryCache: {
+          prefixKey: "organizationMembers",
+          staleTime: 60 * 1000,
+        },
+      });
+>>>>>>> 1e5cfc91c7d6761ace37037c0315ad5e89bf2058
 
       self.users.push(...list);
     }),
